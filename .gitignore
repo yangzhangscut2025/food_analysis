@@ -1,0 +1,29 @@
+# 环境变量（含API密钥，切勿提交）
+.env
+
+# 生成的输出文件
+*.xlsx
+*.html
+*.png
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 分类缓存
+classification_cache.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
