@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SCUT Wushan Food Analysis</title>
+<title>五山校区餐饮分析 — 项目展示</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
@@ -12,17 +12,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei
 
 /* Hero */
 .hero{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
-  color:#fff;padding:60px 0 40px;text-align:center}
+  color:#fff;padding:64px 0 44px;text-align:center}
 .hero h1{font-size:clamp(22px,5vw,32px);font-weight:700;margin-bottom:8px}
-.hero .sub{font-size:15px;color:rgba(255,255,255,0.7);margin-bottom:16px}
-.hero .sub-en{font-size:13px;color:rgba(255,255,255,0.5)}
-.btn{display:inline-block;padding:8px 20px;border-radius:6px;font-size:14px;font-weight:600;
+.hero .sub{font-size:14px;color:rgba(255,255,255,0.7);margin-bottom:4px}
+.hero .tech{font-size:12px;color:rgba(255,255,255,0.45)}
+.btn{display:inline-block;padding:8px 22px;border-radius:6px;font-size:14px;font-weight:600;
   text-decoration:none;transition:all .2s;cursor:pointer}
-.btn-dark{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.25)}
-.btn-dark:hover{background:rgba(255,255,255,0.25)}
-.btn-ghost{background:transparent;color:#1677ff;border:1px solid #1677ff}
-.btn-ghost:hover{background:#1677ff;color:#fff}
-.hero-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+.btn-dark{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+.btn-dark:hover{background:rgba(255,255,255,0.22)}
+.hero-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
 
 /* Sections */
 .section{padding:48px 0}
@@ -36,18 +34,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei
 .fcard{background:#fff;border-radius:12px;padding:24px 20px;
   box-shadow:0 2px 12px rgba(0,0,0,0.04);transition:transform .2s}
 .fcard:hover{transform:translateY(-3px)}
-.fcard .icon{font-size:28px;margin-bottom:10px}
+.fcard .step{display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;
+  background:#1677ff;color:#fff;border-radius:50%;font-size:14px;font-weight:700;margin-bottom:10px}
 .fcard h3{font-size:15px;font-weight:600;margin-bottom:6px;color:#1a1a1a}
 .fcard p{font-size:13px;color:#888}
 
 /* Tech Tags */
 .tags{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:600px;margin:0 auto}
-.tag{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;
+.tag{display:inline-block;padding:4px 14px;border-radius:20px;font-size:12px;
   font-weight:500;background:#e8f0fe;color:#1677ff}
 
 /* Stats */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:20px;
-  max-width:600px;margin:0 auto}
+  max-width:640px;margin:0 auto}
 .stat{background:#fff;border-radius:12px;padding:20px;text-align:center;
   box-shadow:0 2px 12px rgba(0,0,0,0.04)}
 .stat .val{font-size:32px;font-weight:700;color:#1a1a2e}
@@ -56,18 +55,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei
 /* Demo iframe */
 .demo-wrap{background:#fff;border-radius:12px;overflow:hidden;
   box-shadow:0 2px 20px rgba(0,0,0,0.06)}
-.demo-wrap iframe{width:100%;height:600px;border:none}
-.demo-fallback{text-align:center;padding:40px;color:#888;font-size:14px}
-.demo-fallback a{color:#1677ff}
+.demo-wrap iframe{width:100%;height:620px;border:none}
+.demo-tip{text-align:center;padding:12px;font-size:12px;color:#bbb;
+  border-top:1px solid #f0f0f0}
 
 /* Footer */
-.footer{text-align:center;padding:30px 0;color:#bbb;font-size:12px}
+.footer{text-align:center;padding:32px 0;color:#bbb;font-size:12px}
+.footer a{color:#1677ff;text-decoration:none}
 
 /* Mobile */
 @media(max-width:640px){
   .hero{padding:40px 0 30px}
   .section{padding:32px 0}
-  .demo-wrap iframe{height:420px}
+  .demo-wrap iframe{height:450px}
 }
 </style>
 </head>
@@ -76,86 +76,87 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei
 <!-- Hero -->
 <div class="hero">
   <div class="container">
-    <h1>Wushan Campus Food Map</h1>
-    <div class="sub">华南理工大学五山校区周边餐饮分析</div>
-    <div class="sub-en">Amap POI Collection + DeepSeek Classification + Interactive Visualization</div>
+    <h1>五山校区周边餐饮分析</h1>
+    <div class="sub">华南理工大学五山校区 · 2000m 半径 · 全品类餐饮 POI</div>
+    <div class="tech">高德地图 POI 采集 + DeepSeek 智能分类 + Folium 交互可视化</div>
     <div class="hero-btns">
       <a class="btn btn-dark" href="https://github.com/yangzhangscut2025/food_analysis" target="_blank">
-        GitHub Repo
+        GitHub 仓库
       </a>
       <a class="btn btn-dark" href="wushan_food_map.html" target="_blank">
-        Full Map
+        全屏地图
       </a>
     </div>
   </div>
 </div>
 
-<!-- Features -->
+<!-- 流程 -->
 <div class="section">
   <div class="container">
-    <div class="section-title">Pipeline</div>
+    <div class="section-title">项目流程</div>
     <div class="features">
       <div class="fcard">
-        <div class="icon">1</div>
-        <h3>POI Collection</h3>
-        <p>5x5 grid (25 cells) via Amap API covering 2000m radius around SCUT Wushan campus. Auto-retry on rate-limit with exponential backoff.</p>
+        <div class="step">1</div>
+        <h3>网格化采集</h3>
+        <p>5×5 网格（25 个子区），覆盖华南理工大学五山校区周边 2000m 范围。高德 API 分页获取，遇限流自动重试（指数退避）。按店名+地址去重。</p>
       </div>
       <div class="fcard">
-        <div class="icon">2</div>
-        <h3>Smart Classification</h3>
-        <p>DeepSeek LLM classifies shops into 8 categories (hotpot, tea, noodles, etc.) with few-shot prompting. Results cached to JSON for zero-cost re-runs.</p>
+        <div class="step">2</div>
+        <h3>智能分类</h3>
+        <p>DeepSeek 大语言模型根据店名和地址，自动归类到 8 个餐饮类别（火锅、茶饮、粉面馆等）。批量调用每 10 条合并一次请求，结果缓存 JSON，重复运行零费用。</p>
       </div>
       <div class="fcard">
-        <div class="icon">3</div>
-        <h3>Interactive Map</h3>
-        <p>Folium + Leaflet with LayerControl, MarkerCluster, HeatMap. Color-coded per category. Popup with Amap navigation link. Legend panel with collection date.</p>
+        <div class="step">3</div>
+        <h3>交互式地图</h3>
+        <p>Folium 生成 Leaflet 地图，支持图层控制（8 个类别 + 热力图自由开关）、MarkerCluster 聚合标记（显示数量，点击展开）、彩色圆点标记、悬停显示店名、点击弹窗含高德导航链接。</p>
       </div>
       <div class="fcard">
-        <div class="icon">4</div>
-        <h3>Charts & Report</h3>
-        <p>Matplotlib bar + pie charts. Console summary with top categories and distribution insights.</p>
+        <div class="step">4</div>
+        <h3>统计图表</h3>
+        <p>Matplotlib 绘制类别数量柱状图 + 占比饼图，自动适配中文字体（SimHei）。控制台输出分类摘要：总数、Top 类别、茶饮/火锅数量等。</p>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Tech Stack -->
+<!-- 技术栈 -->
 <div class="section" style="background:#fff">
   <div class="container">
-    <div class="section-title">Tech Stack</div>
+    <div class="section-title">技术栈</div>
     <div class="tags">
       <span class="tag">Python 3.9+</span>
-      <span class="tag">Amap Web API</span>
+      <span class="tag">高德地图 Web API</span>
       <span class="tag">DeepSeek API</span>
       <span class="tag">Folium / Leaflet</span>
       <span class="tag">Pandas</span>
       <span class="tag">Matplotlib</span>
       <span class="tag">Seaborn</span>
       <span class="tag">Requests</span>
-      <span class="tag">Jupyter</span>
+      <span class="tag">Jupyter Notebook</span>
     </div>
   </div>
 </div>
 
-<!-- Demo -->
+<!-- 在线演示 -->
 <div class="section">
   <div class="container">
-    <div class="section-title">Live Demo</div>
+    <div class="section-title">在线演示</div>
     <div class="demo-wrap">
-      <iframe src="wushan_food_map.html" title="Food Map Demo" loading="lazy"></iframe>
+      <iframe src="wushan_food_map.html" title="交互式餐饮地图" loading="lazy"></iframe>
+      <div class="demo-tip">可通过右上角图层控制器切换类别和热力图 · 点击聚合圆圈展开 · 点击店铺查看详情并导航</div>
     </div>
   </div>
 </div>
 
-<!-- Stats -->
+<!-- 数据亮点 -->
 <div class="section">
   <div class="container">
-    <div class="section-title">Data Highlights</div>
+    <div class="section-title">数据概览</div>
     <div class="stats">
-      <div class="stat"><div class="val">~520</div><div class="lbl">Total Shops</div></div>
-      <div class="stat"><div class="val">8</div><div class="lbl">Categories</div></div>
-      <div class="stat"><div class="val">25</div><div class="lbl">Grid Cells</div></div>
-      <div class="stat"><div class="val">2000m</div><div class="lbl">Coverage Radius</div></div>
+      <div class="stat"><div class="val">~520</div><div class="lbl">店铺总数</div></div>
+      <div class="stat"><div class="val">8</div><div class="lbl">餐饮类别</div></div>
+      <div class="stat"><div class="val">25</div><div class="lbl">采集网格数</div></div>
+      <div class="stat"><div class="val">2000m</div><div class="lbl">覆盖半径</div></div>
     </div>
   </div>
 </div>
@@ -163,8 +164,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei
 <!-- Footer -->
 <div class="footer">
   <div class="container">
-    Yang Zhang &middot; 2026.06 &middot;
-    <a href="https://github.com/yangzhangscut2025/food_analysis" style="color:#bbb">GitHub</a>
+    张阳 · 2026.06 ·
+    <a href="https://github.com/yangzhangscut2025/food_analysis">GitHub</a>
   </div>
 </div>
 

@@ -1,162 +1,160 @@
-# SCUT Wushan Food Analysis
+# 华南理工大学五山校区周边餐饮分析
 
-Amap POI + DeepSeek auto-classify + Folium visualization.
+高德POI采集 + DeepSeek自动分类 + Folium交互可视化
 
-## 1. Overview
+## 1. 项目背景
 
-Expanded from a milk-tea-shop scraping assignment to a full pipeline:
+基于奶茶店爬取作业升级为完整数据流水线：
 
-- **Range**: all food POIs within 2000m of SCUT Wushan Campus
-- **Classification**: DeepSeek API auto-labels 8 categories
-- **Visualization**: interactive map (LayerControl + marker cluster + heatmap + legend) + charts
+- **数据范围**：从单一奶茶品类 → 周边所有餐饮（正餐、快餐、茶饮、小吃等）
+- **分类方式**：从手动打标签 → DeepSeek API 智能分类（8 个类别）
+- **分析深度**：从简单统计 → 交互式地图 + 图层控制 + 聚合标记 + 热力图 + 统计图表
 
-## 2. Data Sources
+## 2. 数据来源
 
-| Layer     | Source                        | Purpose                                |
-| :-------- | :---------------------------- | :------------------------------------- |
-| POI       | Amap `/v3/place/around` API   | name, address, lng/lat, typecode       |
-| Classify  | DeepSeek Chat API             | auto-tag into 8 food categories        |
-| Basemap   | Amap tiles (via folium)       | map display (replaces OSM for speed)   |
+| 数据层   | 来源                        | 用途                             |
+| :------- | :-------------------------- | :------------------------------- |
+| 基础POI  | 高德地图 `/v3/place/around` | 店名、地址、经纬度、类型码       |
+| 智能分类 | DeepSeek Chat API           | 8 类别自动归类（火锅/茶饮/粉面等）|
+| 底图     | 高德瓦片（通过 folium）     | 替代 OSM，国内加载快             |
 
-**Scope**: 25-point (5x5) grid, 500m per cell, centered on SCUT (113.351, 23.155), covering ~2000m radius. Amap `types=050000`.
+**采集范围**：华南理工大学五山校区（113.351, 23.155）为中心，5×5 网格（25个子区域），500m半径/子区，覆盖 ~2000m。
 
-## 3. Tech Stack
+## 3. 技术栈
 
 - Python 3.9+
-- requests — Amap & DeepSeek API
-- pandas — data cleaning, dedup, storage
-- folium + plugins (MarkerCluster, HeatMap, Fullscreen, LayerControl) — interactive map
-- matplotlib / seaborn — bar + pie charts
-- python-dotenv — API key management
+- requests — 调用高德API与DeepSeek API
+- pandas — 数据清洗、去重、存储
+- folium + 插件（MarkerCluster, HeatMap, Fullscreen, LayerControl）— 交互式地图
+- matplotlib / seaborn — 统计图表
+- python-dotenv — 环境变量管理（API 密钥）
 
-## 4. Pipeline
+## 4. 项目流程
 
-```
-Amap API -> 5x5 grid fetch -> merge & dedup -> raw Excel
-                    |
-            DeepSeek batch classify (10/batch, cached)
-                    |
-            add "category" column -> final Excel
-                    |
-        folium map (LayerControl toggle + MarkerCluster + HeatMap + legend)
-                    |
-        matplotlib bar/pie charts
-                    |
-              summary report
+```text
+高德API -> 5x5网格分页采集 -> 合并去重 -> 原始数据 Excel
+                  ↓
+        DeepSeek 批量分类（每10条一批，结果缓存JSON）
+                  ↓
+        带"类别"字段的最终数据表
+                  ↓
+   folium 地图（LayerControl + MarkerCluster + HeatMap + 图例面板）
+                  ↓
+   matplotlib 柱状图/饼图 + 分析结论
 ```
 
-## 5. Project Structure
+## 5. 项目结构
 
 ```
 food/
-├── .env                        # API keys (fill in yourself)
+├── .env                        # API密钥（自行填写，已 gitignore）
 ├── .gitignore
-├── README.md
-├── requirements.txt
-├── config.py                   # constants: grid, categories, colors, URLs
-├── poi_fetcher.py              # Amap grid collection + retry logic
-├── classifier.py               # DeepSeek batch classify + cache
-├── visualizer.py               # folium map + legend + matplotlib charts
-├── main.py                     # pipeline entry point
-├── food_analysis.ipynb         # Jupyter notebook version
-├── classification_cache.json   # auto-generated cache
-├── wushan_food_2026_raw.xlsx   # raw POI data
-├── wushan_food_2026.xlsx       # classified data
-├── wushan_food_map.html        # interactive map
-├── category_bar.png            # bar chart
-└── category_pie.png            # pie chart
+├── README.md                   # 项目文档
+├── requirements.txt            # Python 依赖
+├── config.py                   # 全局配置（网格坐标、类别、颜色、路径）
+├── poi_fetcher.py              # 高德API网格采集（含限流重试）
+├── classifier.py               # DeepSeek 批量分类（含缓存）
+├── visualizer.py               # 地图 + 图例 + matplotlib 图表
+├── main.py                     # 主流水线入口
+├── project.html                # 项目展示页（个人主页用）
+├── food_analysis.ipynb         # Jupyter Notebook 版本
+├── classification_cache.json   # 分类缓存（自动生成）
+├── wushan_food_2026_raw.xlsx   # 原始POI数据
+├── wushan_food_2026.xlsx       # 带分类标签的最终数据
+├── wushan_food_map.html        # 交互式地图（浏览器打开）
+├── category_bar.png            # 类别柱状图
+└── category_pie.png            # 类别饼图
 ```
 
-## 6. Key Implementation
+## 6. 核心实现
 
-### 6.1 Amap Grid Collection
+### 6.1 高德网格采集
 
-25-grid coverage with retry on rate-limit (QPS), exponential backoff.
+25 个网格点覆盖 2000m 范围。遇到 `CUQPS_HAS_EXCEEDED_THE_LIMIT` 自动重试（最多 3 次，指数退避 2s/4s/8s）。
 
 ```python
 def fetch_pois(lng, lat, radius=500):
-    # paginated Amap around API
-    # auto-retry on CUQPS_EXCEEDED (up to 3x, 2s/4s/8s backoff)
+    # 高德 around 接口分页获取
+    # 限流自动重试
 
-# 5x5 grid covering 2000m from SCUT center
-for lng, lat in GRID_CENTERS:
+for lng, lat in GRID_CENTERS:          # 5x5 共 25 个中心点
     shops = fetch_pois(lng, lat)
-# dedup by (name, address)
+df.drop_duplicates(["name", "address"])  # 去重
 ```
 
-### 6.2 DeepSeek Classification
+### 6.2 DeepSeek 分类
 
-8 categories: hotpot, grill, tea, fast-food, noodles, regional-cuisine, bakery, other.
+8 个类别：火锅、烧烤、茶饮、快餐简餐、粉面馆、地方菜系、面包甜点、其他。
 
-- Batch: 10 shops per API call
-- Cache: `classification_cache.json` prevents re-calling for known shops
-- Prompt: system-level few-shot with JSON output format
+- 批量调用：每 10 条合并一次请求
+- 结果缓存：`classification_cache.json`，重复运行不重复扣费
+- 低温度参数（temperature=0.1）保证输出稳定
+- System prompt 含分类说明，要求 JSON 格式返回
 
-### 6.3 Map (Interactive)
+### 6.3 地图功能
 
-| Feature       | Implementation                         |
-| :------------ | :------------------------------------- |
-| Layer toggle  | `folium.LayerControl` (8 cats + heatmap)|
-| Clustering    | `MarkerCluster` — shows count, click to expand |
-| Markers       | `DivIcon` 20px colored circles         |
-| Tooltip       | shop name on hover                     |
-| Popup         | name + category + address + Amap nav link |
-| Heatmap       | `HeatMap` plugin, toggle via layer control |
-| Legend        | top-right panel: total count + per-category stats + collection date |
-| Fullscreen    | `Fullscreen` plugin (top-left)         |
-| Coords        | `MousePosition` (bottom-right)         |
+| 功能         | 实现方式                                    |
+| :----------- | :------------------------------------------ |
+| 图层切换     | `LayerControl` — 8 个类别 + 热力图，自由开关  |
+| 标记聚合     | `MarkerCluster` — 邻近店铺聚合，显示数量，点击展开 |
+| 标记样式     | `DivIcon` 20px 彩色圆点                      |
+| 悬停提示     | `Tooltip` 显示店名                           |
+| 点击弹窗     | 店名 + 类别 + 地址 + 高德导航链接按钮         |
+| 热力图       | `HeatMap` 插件，通过图层控制器开关             |
+| 图例面板     | 右上角：总数 + 各类别数量/占比 + 采集日期       |
+| 全屏         | `Fullscreen` 插件（左上角）                   |
 
-### 6.4 Coordinates
+### 6.4 坐标系
 
-Amap returns GCJ-02 (Mars coordinates). Folium uses same — no conversion needed.
+高德返回 GCJ-02（火星坐标系），folium 使用相同坐标系，无需转换。
 
-## 7. Quick Start
+## 7. 快速开始
 
 ```bash
-# 1. Install dependencies
+# 1. 安装依赖
 pip install -r requirements.txt
 
-# 2. Fill in API keys in .env
-AMAP_KEY=your_amap_key
-DEEPSEEK_API_KEY=your_deepseek_key
+# 2. 在 .env 中填写 API 密钥
+AMAP_KEY=你的高德key
+DEEPSEEK_API_KEY=你的deepseek key
 
-# 3. Run (skips collection if raw data exists)
+# 3. 运行（原始数据存在则跳过采集）
 python main.py
 
-# Force re-collect
+# 强制重新采集
 python main.py --force
 
-# Or use Jupyter
+# 或使用 Jupyter
 jupyter notebook food_analysis.ipynb
 ```
 
-> DeepSeek API incurs small cost. Classification results are cached; re-runs skip API calls for cached items.
+> DeepSeek API 调用会产生少量费用。分类结果已缓存，重复运行不额外扣费。
 
-## 8. Outputs
+## 8. 输出文件
 
-| File                        | Description                       |
-| :-------------------------- | :-------------------------------- |
-| `wushan_food_2026_raw.xlsx` | raw POI data from Amap            |
-| `wushan_food_2026.xlsx`     | final data with category labels   |
-| `wushan_food_map.html`      | interactive map (open in browser) |
-| `category_bar.png`          | category count bar chart          |
-| `category_pie.png`          | category share pie chart          |
+| 文件                          | 说明                     |
+| :---------------------------- | :----------------------- |
+| `wushan_food_2026_raw.xlsx`   | 原始采集数据             |
+| `wushan_food_2026.xlsx`       | 带类别标签的最终数据     |
+| `wushan_food_map.html`        | 交互式地图（浏览器打开） |
+| `category_bar.png`            | 类别柱状图               |
+| `category_pie.png`            | 类别饼图                 |
 
-## 9. Future
+## 9. 可扩展方向
 
-- [ ] Dianping ratings & avg-spend integration
-- [ ] Time-segment analysis (breakfast / late-night)
-- [ ] Streamlit / PyEcharts dashboard
-- [ ] Distance calculation to campus gates
-- [ ] Competitive analysis (same-category heatmaps)
+- [ ] 接入大众点评评分与人均消费
+- [ ] 时间段分析（早餐/夜宵分布）
+- [ ] Streamlit / PyEcharts Dashboard
+- [ ] 距离计算（店铺到校区各门距离）
+- [ ] 同类竞品热力对比
 
-## 10. References
+## 10. 参考
 
-- Amap: https://lbs.amap.com/
-- DeepSeek: https://platform.deepseek.com/
-- Folium: https://python-visualization.github.io/folium/
+- 高德开放平台：https://lbs.amap.com/
+- DeepSeek API：https://platform.deepseek.com/
+- Folium 文档：https://python-visualization.github.io/folium/
 
 ---
 
-**Author**: Yang Zhang
-**Date**: 2026.06
+**Author**：张阳
+**Date**：2026.06
