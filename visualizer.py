@@ -1,214 +1,274 @@
 """
-可视化模块
+Visualization module.
 
-生成两种可视化结果：
-1. folium 交互式地图 — 按类别颜色标记店铺位置 + 热力图
-2. matplotlib 统计图表 — 类别数量柱状图 + 饼图
+Outputs:
+  1. folium interactive map (marker clusters + heatmap + layer control + legend)
+  2. matplotlib charts (bar + pie of category counts)
 """
+import os
+from datetime import date
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import seaborn as sns
+import pandas as pd
 import folium
-from folium.plugins import HeatMap
+from folium.plugins import HeatMap, MarkerCluster, Fullscreen
 from config import (
-    WUSHAN_CENTER, CATEGORY_COLORS, AMAP_TILE_URL,
+    WUSHAN_CENTER, CATEGORIES, CATEGORY_COLORS, AMAP_TILE_URL,
     MAP_FILE, BAR_CHART_FILE, PIE_CHART_FILE
 )
 
 
 def _setup_chinese_font():
-    """
-    检测并设置中文字体，避免图表中文乱码。
-    优先使用 SimHei，其次 Microsoft YaHei。
-    """
-    available_fonts = {f.name for f in fm.fontManager.ttflist}
-
-    for font_name in ["SimHei", "Microsoft YaHei", "WenQuanYi Micro Hei"]:
-        if font_name in available_fonts:
-            plt.rcParams["font.sans-serif"] = [font_name, "sans-serif"]
+    """检测并设置中文字体，避免图表中文乱码。"""
+    windows_font_dir = os.environ.get("WINDIR", r"C:\Windows") + r"\Fonts"
+    CJK_FONT_FILES = [
+        ("simhei.ttf", "SimHei"),
+        ("msyh.ttc", "Microsoft YaHei"),
+        ("simsun.ttc", "SimSun"),
+    ]
+    for font_file, fallback_name in CJK_FONT_FILES:
+        font_path = os.path.join(windows_font_dir, font_file)
+        if not os.path.exists(font_path):
+            continue
+        try:
+            fm.fontManager.addfont(font_path)
+            prop = fm.FontProperties(fname=font_path)
+            real_name = prop.get_name()
+            plt.rcParams["font.sans-serif"] = [real_name, fallback_name, "sans-serif"]
+            plt.rcParams["font.family"] = "sans-serif"
             plt.rcParams["axes.unicode_minus"] = False
-            return font_name
-
-    # 如果都不可用，尝试用 sans-serif 兜底
-    plt.rcParams["font.sans-serif"] = ["sans-serif"]
+            print(f"  [font] loaded: {font_file} -> family='{real_name}'")
+            return real_name
+        except Exception:
+            plt.rcParams["font.sans-serif"] = [fallback_name, "sans-serif"]
+            plt.rcParams["font.family"] = "sans-serif"
+            plt.rcParams["axes.unicode_minus"] = False
+            return fallback_name
+    plt.rcParams["font.sans-serif"] = ["SimHei", "Microsoft YaHei", "sans-serif"]
+    plt.rcParams["font.family"] = "sans-serif"
     plt.rcParams["axes.unicode_minus"] = False
-    print("[警告] 未找到中文字体，图表中文可能显示为方块")
     return None
+
+def _collection_date():
+    """Get collection date from raw data file mtime, or today."""
+    from config import RAW_DATA_FILE
+    try:
+        ts = os.path.getmtime(RAW_DATA_FILE)
+        return date.fromtimestamp(ts).strftime("%Y-%m-%d")
+    except OSError:
+        return date.today().strftime("%Y-%m-%d")
+
+
+def _inject_legend(html_path, categories, colors, counts, total):
+    """Post-process: inject a simple stats legend panel before </body>."""
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html = f.read()
+
+    rows = ""
+    for cat in sorted(categories, key=lambda c: counts.get(c, 0), reverse=True):
+        c = counts.get(cat, 0)
+        pct = c / total * 100
+        color = colors.get(cat, "gray")
+        rows += (
+            '<div style="display:flex;align-items:center;padding:3px 0;font-size:12px;">'
+            '<span style="width:10px;height:10px;background:{};border-radius:2px;'
+            'margin-right:8px;flex-shrink:0;"></span>'
+            '<span style="flex:1;color:#444;">{}</span>'
+            '<span style="font-weight:600;color:#333;margin-right:2px;">{}</span>'
+            '<span style="color:#aaa;font-size:10px;">{:.0f}%</span>'
+            '</div>'
+        ).format(color, cat, c, pct)
+
+    legend = (
+        '<div style="position:fixed;top:50px;right:12px;z-index:9998;'
+        'background:rgba(255,255,255,0.88);border:1px solid rgba(0,0,0,0.08);'
+        'border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.06);'
+        'padding:12px 16px;min-width:170px;'
+        'font-family:-apple-system,BlinkMacSystemFont,\'PingFang SC\',\'Microsoft YaHei\',sans-serif;">'
+        '<div style="font-size:20px;font-weight:700;color:#1a1a1a;margin-bottom:2px;">{}'
+        '<span style="font-size:11px;font-weight:400;color:#aaa;"> shops</span></div>'
+        '<div style="font-size:10px;color:#bbb;margin-bottom:8px;padding-bottom:6px;'
+        'border-bottom:1px solid rgba(0,0,0,0.06);">Wushan SCUT Food Map</div>'
+        '{}'
+        '<div style="font-size:10px;color:#ccc;margin-top:6px;padding-top:6px;'
+        'border-top:1px solid rgba(0,0,0,0.06);text-align:right;">'
+        'Collected {}</div>'
+        '</div>'
+    ).format(total, rows, _collection_date())
+
+    html = html.replace('</body>', legend + '</body>')
+
+    with open(html_path, 'w', encoding='utf-8') as f:
+        f.write(html)
 
 
 def create_map(df, output_path=None):
-    """
-    创建交互式地图：按类别颜色标记 + 热力图叠加。
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        包含 name, lng, lat, category 列的店铺数据
-    output_path : str, optional
-        HTML 输出路径，默认使用 config 中的 MAP_FILE
-
-    Returns
-    -------
-    folium.Map
-        生成的地图对象（在 Jupyter 中可直接显示）
-    """
+    """Create interactive folium map with marker clusters, heatmap, and custom UI."""
     if output_path is None:
         output_path = MAP_FILE
 
     print("\n" + "=" * 50)
-    print("步骤 3/3：生成可视化")
+    print("Step 3/3: Generating visualizations")
     print("=" * 50)
-    print("\n  ⏳ 生成交互式地图...")
+    print("\n  Generating interactive map...")
 
     center_lng, center_lat = WUSHAN_CENTER
 
-    # 创建地图，使用高德瓦片
     m = folium.Map(
         location=[center_lat, center_lng],
         zoom_start=15,
         tiles=AMAP_TILE_URL,
-        attr="高德地图",
+        attr=" ",
+        control_scale=True,
     )
 
-    # 按类别添加标记
+    Fullscreen(position="topleft").add_to(m)
+
+    groups = {}
+
+    for cat in CATEGORIES:
+        fg = folium.FeatureGroup(name=cat, show=True)
+        mc = MarkerCluster().add_to(fg)
+        groups[cat] = {"fg": fg, "mc": mc}
+
+    fg_all = folium.FeatureGroup(name="All", show=True)
+    mc_all = MarkerCluster().add_to(fg_all)
+
+    fg_heat = folium.FeatureGroup(name="Heatmap", show=False)
+
+    def _popup_html(name, category, address, lat, lng):
+        from urllib.parse import quote
+        amap_url = "https://uri.amap.com/marker?position={},{}&name={}".format(lng, lat, quote(name))
+        return (
+            '<div style="font-family:-apple-system,BlinkMacSystemFont,'
+            "'Segoe UI','Microsoft YaHei',sans-serif;min-width:200px;padding:2px 0;\">"
+            '<div style="font-size:15px;font-weight:600;color:#1a1a1a;margin-bottom:8px;">{name}</div>'
+            '<div style="font-size:12px;color:#888;margin-bottom:3px;">'
+            '<span style="display:inline-block;width:8px;height:8px;background:#999;'
+            'border-radius:2px;margin-right:6px;"></span>{cat}</div>'
+            '<div style="font-size:12px;color:#888;margin-bottom:12px;">{addr}</div>'
+            '<a href="{url}" target="_blank" style="display:inline-block;padding:5px 16px;'
+            'background:#1677ff;color:#fff;text-decoration:none;border-radius:6px;font-size:12px;'
+            'font-weight:500;">Navigate</a>'
+            '</div>'
+        ).format(name=name, cat=category, addr=address, url=amap_url)
+
+    def _marker(lat, lng, color, name, category, address):
+        icon_html = (
+            '<div style="width:20px;height:20px;background:{c};border:3px solid #fff;'
+            'border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer;"></div>'
+        ).format(c=color)
+        return folium.Marker(
+            location=[lat, lng],
+            icon=folium.DivIcon(html=icon_html),
+            tooltip=folium.Tooltip("<b>{}</b>".format(name), sticky=False),
+            popup=folium.Popup(_popup_html(name, category, address, lat, lng), max_width=320),
+        )
+
     for _, row in df.iterrows():
-        category = row.get("category", "其他")
+        category = row.get("category", "")
         color = CATEGORY_COLORS.get(category, "gray")
+        lat, lng = row["lat"], row["lng"]
+        if pd.isna(lat) or pd.isna(lng):
+            continue
+        address = row.get("address", "")
+        name = row["name"]
+        _marker(lat, lng, color, name, category, address).add_to(mc_all)
+        target = groups.get(category) or groups.get("其他")
+        if target:
+            _marker(lat, lng, color, name, category, address).add_to(target["mc"])
 
-        popup_text = f"<b>{row['name']}</b><br>类别：{category}<br>{row.get('address', '')}"
-
-        folium.Marker(
-            location=[row["lat"], row["lng"]],
-            popup=folium.Popup(popup_text, max_width=250),
-            icon=folium.Icon(color=color, icon="cutlery", prefix="fa"),
-        ).add_to(m)
-
-    # 添加热力图
     heat_data = [[row["lat"], row["lng"]] for _, row in df.iterrows()]
-    HeatMap(heat_data, radius=15, blur=10, max_zoom=1).add_to(m)
+    HeatMap(heat_data, radius=15, blur=10, max_zoom=1).add_to(fg_heat)
 
-    # 保存
+    fg_all.add_to(m)
+    fg_heat.add_to(m)
+    for cat in CATEGORIES:
+        groups[cat]["fg"].add_to(m)
+
+    folium.plugins.MousePosition(position="bottomright").add_to(m)
+
+    # 原生图层控制 — 免注入，直接可用
+    folium.LayerControl(collapsed=False).add_to(m)
+
     m.save(output_path)
-    print(f"  地图已保存到: {output_path}")
-    print(f"  共标记 {len(df)} 个店铺，覆盖 {df['category'].nunique()} 个类别")
+
+    # Inject legend panel (pure HTML, no JS)
+    category_counts = df["category"].value_counts()
+    total = len(df)
+    _inject_legend(output_path, CATEGORIES, CATEGORY_COLORS, category_counts, total)
+
+    print("  Map saved to: {}".format(output_path))
+    print("  {} shops across {} categories".format(total, df['category'].nunique()))
+    print("  LayerControl + legend panel in top-right")
 
     return m
 
 
 def create_charts(df, output_dir=None):
-    """
-    生成类别数量柱状图和饼图。
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        包含 category 列的店铺数据
-    output_dir : str, optional
-        输出目录（文件名使用 config 中的定义）
-    """
-    print("\n  ⏳ 生成统计图表...")
-
-    _setup_chinese_font()
+    """Generate bar chart and pie chart of category counts."""
+    print("\n  Generating charts...")
 
     category_counts = df["category"].value_counts()
-
-    # 排序：按数量从多到少
     category_counts = category_counts.sort_values(ascending=True)
 
-    # 使用 seaborn 风格
     sns.set_style("whitegrid")
+    _setup_chinese_font()
 
-    # --- 柱状图 ---
+    # Bar chart
     fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
-
-    # 按类别颜色绘制柱状图
     colors = [CATEGORY_COLORS.get(cat, "gray") for cat in category_counts.index]
     bars = ax_bar.barh(category_counts.index, category_counts.values, color=colors)
-
-    # 在柱子上标注数量
     for bar_obj, val in zip(bars, category_counts.values):
-        ax_bar.text(
-            bar_obj.get_width() + 0.3,
-            bar_obj.get_y() + bar_obj.get_height() / 2,
-            str(val),
-            va="center",
-            fontsize=11,
-        )
-
-    ax_bar.set_xlabel("店铺数量", fontsize=12)
-    ax_bar.set_title("五山地铁站周边餐饮类别数量分布", fontsize=14, fontweight="bold")
+        ax_bar.text(bar_obj.get_width() + 0.3, bar_obj.get_y() + bar_obj.get_height() / 2,
+                    str(val), va="center", fontsize=11)
+    ax_bar.set_xlabel("count", fontsize=12)
+    ax_bar.set_title("SCUT Wushan Food Category Distribution", fontsize=14, fontweight="bold")
     ax_bar.set_xlim(0, category_counts.max() * 1.2)
     plt.tight_layout()
-
-    bar_path = BAR_CHART_FILE if output_dir is None else f"{output_dir}/{BAR_CHART_FILE}"
+    bar_path = BAR_CHART_FILE if output_dir is None else "{}/{}".format(output_dir, BAR_CHART_FILE)
     fig_bar.savefig(bar_path, dpi=150, bbox_inches="tight")
     plt.close(fig_bar)
-    print(f"  柱状图已保存到: {bar_path}")
+    print("  Bar chart saved: {}".format(bar_path))
 
-    # --- 饼图 ---
+    # Pie chart
     fig_pie, ax_pie = plt.subplots(figsize=(8, 8))
-
     pie_colors = [CATEGORY_COLORS.get(cat, "gray") for cat in category_counts.index]
     wedges, texts, autotexts = ax_pie.pie(
-        category_counts.values,
-        labels=category_counts.index,
-        colors=pie_colors,
-        autopct="%1.1f%%",
-        startangle=90,
-        pctdistance=0.85,
-    )
-
-    # 美化文字
+        category_counts.values, labels=category_counts.index,
+        colors=pie_colors, autopct="%1.1f%%", startangle=90, pctdistance=0.85)
     for t in autotexts:
         t.set_fontsize(10)
         t.set_color("white")
         t.set_fontweight("bold")
     for t in texts:
         t.set_fontsize(11)
-
-    ax_pie.set_title("五山地铁站周边餐饮类别占比", fontsize=14, fontweight="bold")
+    ax_pie.set_title("SCUT Wushan Food Category Share", fontsize=14, fontweight="bold")
     plt.tight_layout()
-
-    pie_path = PIE_CHART_FILE if output_dir is None else f"{output_dir}/{PIE_CHART_FILE}"
+    pie_path = PIE_CHART_FILE if output_dir is None else "{}/{}".format(output_dir, PIE_CHART_FILE)
     fig_pie.savefig(pie_path, dpi=150, bbox_inches="tight")
     plt.close(fig_pie)
-    print(f"  饼图已保存到: {pie_path}")
+    print("  Pie chart saved: {}".format(pie_path))
 
 
 def print_summary(df):
-    """
-    打印简要的分析结论。
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        包含 category 列的店铺数据
-    """
+    """Print analysis summary to console."""
     print("\n" + "=" * 50)
-    print("分析结论")
+    print("Summary")
     print("=" * 50)
-
     total = len(df)
     category_counts = df["category"].value_counts()
-
-    print(f"\n  共采集到 {total} 家餐饮店。")
-
+    print("\n  Total: {} food shops.".format(total))
     top_cat = category_counts.index[0]
     top_count = category_counts.iloc[0]
-    print(f"  最多的是 {top_cat}（{top_count} 家），集中在五山地铁口周边。")
-
-    # 茶饮类统计
+    print("  Top category: {} ({} shops).".format(top_cat, top_count))
     tea_count = df[df["category"] == "茶饮"].shape[0]
     if tea_count > 0:
-        rank = list(category_counts.index).index("茶饮") + 1
-        ordinal = {1: "第一", 2: "第二", 3: "第三"}.get(rank, f"第{rank}")
-        print(f"  茶饮类（包括奶茶、咖啡）数量{ordinal}（{tea_count} 家），分布沿岳洲路线性扩散。")
-
-    # 火锅/烧烤统计
+        print("  Tea/coffee: {} shops.".format(tea_count))
     hot_grill = df[df["category"].isin(["火锅", "烧烤"])].shape[0]
-    print(f"  火锅/烧烤类共 {hot_grill} 家，数量相对较少。")
-
-    print("\n  输出文件：")
-    print(f"    - 交互地图: {MAP_FILE}")
-    print(f"    - 统计图表: {BAR_CHART_FILE}, {PIE_CHART_FILE}")
+    print("  Hotpot/Grill: {} shops.".format(hot_grill))
+    print("\n  Output files:")
+    print("    - Map: {}".format(MAP_FILE))
+    print("    - Charts: {}, {}".format(BAR_CHART_FILE, PIE_CHART_FILE))

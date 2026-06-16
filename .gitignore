@@ -6,6 +6,9 @@
 *.html
 *.png
 
+# 但项目展示页需提交
+!project.html
+
 # Python
 __pycache__/
 *.py[cod]

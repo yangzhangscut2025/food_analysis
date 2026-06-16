@@ -153,6 +153,9 @@ def classify_all(df):
     print("步骤 2/3：DeepSeek API 批量分类")
     print("=" * 50)
 
+    # 重置索引为连续的 0, 1, 2, ...，避免去重后跳号导致越界
+    df = df.reset_index(drop=True)
+
     if df.empty:
         print("[警告] 数据为空，跳过分类")
         df["category"] = "其他"

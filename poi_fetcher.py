@@ -9,13 +9,57 @@ import requests
 import pandas as pd
 from config import (
     AMAP_KEY, AMAP_AROUND_URL, AMAP_PAGE_SIZE, REQUEST_DELAY,
+    MAX_RETRIES, RETRY_BACKOFF,
     GRID_CENTERS, RAW_DATA_FILE
 )
+
+
+def _is_rate_limit_error(info):
+    """判断是否为限流错误（可重试）"""
+    return info and ("EXCEEDED" in info.upper() or "LIMIT" in info.upper())
+
+
+def _request_with_retry(params, page):
+    """
+    带重试的单次 API 请求。
+    限流和网络错误会自动重试（指数退避），不可恢复错误直接返回 None。
+    """
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(AMAP_AROUND_URL, params=params, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+
+            if data.get("status") != "1":
+                info = data.get("info", "")
+                if _is_rate_limit_error(info):
+                    wait = RETRY_BACKOFF ** (attempt + 1)
+                    print(f"  [重试 {attempt + 1}/{MAX_RETRIES}] 限流，等待 {wait}s...")
+                    time.sleep(wait)
+                    continue
+                else:
+                    # 不可恢复的错误（如 key 无效）
+                    print(f"  [错误] API 返回: {info}")
+                    return None
+
+            return data
+
+        except requests.RequestException as e:
+            if attempt < MAX_RETRIES - 1:
+                wait = RETRY_BACKOFF ** (attempt + 1)
+                print(f"  [重试 {attempt + 1}/{MAX_RETRIES}] 网络错误: {e}，等待 {wait}s...")
+                time.sleep(wait)
+            else:
+                print(f"  [错误] 请求失败，已重试 {MAX_RETRIES} 次: {e}")
+                return None
+
+    return None
 
 
 def fetch_pois(lng, lat, radius=500, types="050000"):
     """
     调用高德 around 接口，分页获取指定中心点周边的所有POI数据。
+    遇到限流或网络错误自动重试（指数退避）。
 
     Parameters
     ----------
@@ -47,19 +91,8 @@ def fetch_pois(lng, lat, radius=500, types="050000"):
             "extensions": "base",
         }
 
-        try:
-            resp = requests.get(AMAP_AROUND_URL, params=params, timeout=15)
-            resp.raise_for_status()
-            data = resp.json()
-        except requests.RequestException as e:
-            print(f"  [警告] 请求失败 (page={page}): {e}")
-            break
-        except ValueError as e:
-            print(f"  [警告] JSON 解析失败 (page={page}): {e}")
-            break
-
-        if data.get("status") != "1":
-            print(f"  [警告] API 返回异常状态: {data.get('info', '未知错误')}")
+        data = _request_with_retry(params, page)
+        if data is None:
             break
 
         pois = data.get("pois", [])
