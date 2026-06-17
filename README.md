@@ -57,7 +57,6 @@ food/
 ├── visualizer.py               # 地图 + 图例 + matplotlib 图表
 ├── main.py                     # 主流水线入口
 ├── project.html                # 项目展示页（个人主页用）
-├── food_analysis.ipynb         # Jupyter Notebook 版本
 ├── classification_cache.json   # 分类缓存（自动生成）
 ├── wushan_food_2026_raw.xlsx   # 原始POI数据
 ├── wushan_food_2026.xlsx       # 带分类标签的最终数据
@@ -123,9 +122,6 @@ python main.py
 
 # 强制重新采集
 python main.py --force
-
-# 或使用 Jupyter
-jupyter notebook food_analysis.ipynb
 ```
 
 > DeepSeek API 调用会产生少量费用。分类结果已缓存，重复运行不额外扣费。
