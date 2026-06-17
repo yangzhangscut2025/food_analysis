@@ -2,11 +2,13 @@
 .env
 
 # 生成的输出文件
-*.xlsx
-*.html
-*.png
+*_food_*.xlsx
+*_food_map.html
+*_category_bar.png
+*_category_pie.png
+*_classification_cache.json
 
-# 但项目展示页需提交
+# 项目展示页需提交
 !project.html
 
 # Python

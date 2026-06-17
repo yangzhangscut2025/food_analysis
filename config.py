@@ -23,7 +23,7 @@ RETRY_BACKOFF = 2     # 重试等待基础秒数（指数增长：2s, 4s, 8s）
 # 华南理工大学五山校区坐标：113.351, 23.155
 # 半径 2000 米范围，用 5×5 网格的 500m 半径子区域覆盖
 # 500m ≈ 0.0045° lat, ≈ 0.0049° lng（广州纬度 cos(23.15°)≈0.919）
-WUSHAN_CENTER = (113.351, 23.155)  # (lng, lat) — 华工五山校区
+WUSHAN_CENTER = (113.351, 23.155)  # (lng, lat) — 华工五山校区（默认）
 GRID_CENTERS = [
     # 5×5 网格，步长 ~500m，覆盖 2000m 半径
     (113.3412, 23.1640), (113.3461, 23.1640), (113.3510, 23.1640), (113.3559, 23.1640), (113.3608, 23.1640),
@@ -32,6 +32,18 @@ GRID_CENTERS = [
     (113.3412, 23.1505), (113.3461, 23.1505), (113.3510, 23.1505), (113.3559, 23.1505), (113.3608, 23.1505),
     (113.3412, 23.1460), (113.3461, 23.1460), (113.3510, 23.1460), (113.3559, 23.1460), (113.3608, 23.1460),
 ]
+
+
+def make_grid(center_lng, center_lat, span=2000, cell=500):
+    """Generate a 5x5 grid centered on (lng, lat), covering ~span meters."""
+    import math
+    step_lng = cell / (111000 * math.cos(math.radians(center_lat)))
+    step_lat = cell / 111000
+    grid = []
+    for i in range(-2, 3):
+        for j in range(-2, 3):
+            grid.append((center_lng + j * step_lng, center_lat + i * step_lat))
+    return grid
 
 # --- DeepSeek API 配置 ---
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"

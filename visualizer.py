@@ -105,17 +105,19 @@ def _inject_legend(html_path, categories, colors, counts, total):
         f.write(html)
 
 
-def create_map(df, output_path=None):
+def create_map(df, output_path=None, center=None):
     """Create interactive folium map with marker clusters, heatmap, and custom UI."""
     if output_path is None:
         output_path = MAP_FILE
+    if center is None:
+        center = WUSHAN_CENTER
 
     print("\n" + "=" * 50)
     print("Step 3/3: Generating visualizations")
     print("=" * 50)
     print("\n  Generating interactive map...")
 
-    center_lng, center_lat = WUSHAN_CENTER
+    center_lng, center_lat = center
 
     m = folium.Map(
         location=[center_lat, center_lng],
@@ -208,8 +210,14 @@ def create_map(df, output_path=None):
     return m
 
 
-def create_charts(df, output_dir=None):
+def create_charts(df, output_paths=None):
     """Generate bar chart and pie chart of category counts."""
+    if output_paths is None:
+        bar_path = BAR_CHART_FILE
+        pie_path = PIE_CHART_FILE
+    else:
+        bar_path, pie_path = output_paths
+
     print("\n  Generating charts...")
 
     category_counts = df["category"].value_counts()
@@ -226,10 +234,9 @@ def create_charts(df, output_dir=None):
         ax_bar.text(bar_obj.get_width() + 0.3, bar_obj.get_y() + bar_obj.get_height() / 2,
                     str(val), va="center", fontsize=11)
     ax_bar.set_xlabel("count", fontsize=12)
-    ax_bar.set_title("SCUT Wushan Food Category Distribution", fontsize=14, fontweight="bold")
+    ax_bar.set_title("Food Category Distribution", fontsize=14, fontweight="bold")
     ax_bar.set_xlim(0, category_counts.max() * 1.2)
     plt.tight_layout()
-    bar_path = BAR_CHART_FILE if output_dir is None else "{}/{}".format(output_dir, BAR_CHART_FILE)
     fig_bar.savefig(bar_path, dpi=150, bbox_inches="tight")
     plt.close(fig_bar)
     print("  Bar chart saved: {}".format(bar_path))
@@ -246,9 +253,8 @@ def create_charts(df, output_dir=None):
         t.set_fontweight("bold")
     for t in texts:
         t.set_fontsize(11)
-    ax_pie.set_title("SCUT Wushan Food Category Share", fontsize=14, fontweight="bold")
+    ax_pie.set_title("Food Category Share", fontsize=14, fontweight="bold")
     plt.tight_layout()
-    pie_path = PIE_CHART_FILE if output_dir is None else "{}/{}".format(output_dir, PIE_CHART_FILE)
     fig_pie.savefig(pie_path, dpi=150, bbox_inches="tight")
     plt.close(fig_pie)
     print("  Pie chart saved: {}".format(pie_path))
