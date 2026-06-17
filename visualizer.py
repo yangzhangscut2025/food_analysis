@@ -82,10 +82,10 @@ def _inject_legend(html_path, categories, colors, counts, total):
         ).format(color, cat, c, pct)
 
     legend = (
-        '<div style="position:fixed;top:50px;right:12px;z-index:9998;'
+        '<div style="position:fixed;top:50px;left:12px;z-index:9998;'
         'background:rgba(255,255,255,0.88);border:1px solid rgba(0,0,0,0.08);'
         'border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.06);'
-        'padding:12px 16px;min-width:170px;'
+        'padding:10px 12px;min-width:100px;'
         'font-family:-apple-system,BlinkMacSystemFont,\'PingFang SC\',\'Microsoft YaHei\',sans-serif;">'
         '<div style="font-size:20px;font-weight:700;color:#1a1a1a;margin-bottom:2px;">{}'
         '<span style="font-size:11px;font-weight:400;color:#aaa;"> shops</span></div>'
@@ -98,7 +98,8 @@ def _inject_legend(html_path, categories, colors, counts, total):
         '</div>'
     ).format(total, rows, _collection_date())
 
-    html = html.replace('</body>', legend + '</body>')
+    hide_attr = '<style>.leaflet-control-attribution{display:none!important}</style>'
+    html = html.replace('</body>', legend + hide_attr + '</body>')
 
     with open(html_path, 'w', encoding='utf-8') as f:
         f.write(html)
@@ -119,10 +120,10 @@ def create_map(df, output_path=None):
     m = folium.Map(
         location=[center_lat, center_lng],
         zoom_start=15,
-        tiles=AMAP_TILE_URL,
-        attr=" ",
+        tiles=None,
         control_scale=True,
     )
+    folium.TileLayer(tiles=AMAP_TILE_URL, name="高德地图", attr=" ").add_to(m)
 
     Fullscreen(position="topleft").add_to(m)
 
@@ -261,14 +262,12 @@ def print_summary(df):
     total = len(df)
     category_counts = df["category"].value_counts()
     print("\n  Total: {} food shops.".format(total))
+    print("  Categories breakdown:")
+    for cat, cnt in category_counts.items():
+        print("    {}: {}".format(cat, cnt))
     top_cat = category_counts.index[0]
     top_count = category_counts.iloc[0]
-    print("  Top category: {} ({} shops).".format(top_cat, top_count))
-    tea_count = df[df["category"] == "茶饮"].shape[0]
-    if tea_count > 0:
-        print("  Tea/coffee: {} shops.".format(tea_count))
-    hot_grill = df[df["category"].isin(["火锅", "烧烤"])].shape[0]
-    print("  Hotpot/Grill: {} shops.".format(hot_grill))
+    print("\n  Top: {} ({} shops)".format(top_cat, top_count))
     print("\n  Output files:")
     print("    - Map: {}".format(MAP_FILE))
     print("    - Charts: {}, {}".format(BAR_CHART_FILE, PIE_CHART_FILE))

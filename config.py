@@ -39,21 +39,23 @@ DEEPSEEK_MODEL = "deepseek-chat"
 CLASSIFICATION_BATCH_SIZE = 10  # 每批处理的店铺数
 CACHE_FILE = "classification_cache.json"
 
-# --- 餐饮类别 ---
+# --- 餐饮类别（10 类）---
 CATEGORIES = [
-    "火锅", "烧烤", "茶饮", "快餐简餐",
-    "粉面馆", "地方菜系", "面包甜点", "其他"
+    "火锅", "烧烤", "茶饮咖啡", "粉面小吃", "快餐简餐",
+    "中餐正餐", "异国料理", "面包甜点", "早餐粥铺", "其他"
 ]
 
 # --- 类别颜色映射（folium marker 颜色）---
 CATEGORY_COLORS = {
     "火锅":     "red",
     "烧烤":     "orange",
-    "茶饮":     "green",
+    "茶饮咖啡": "green",
+    "粉面小吃": "purple",
     "快餐简餐": "blue",
-    "粉面馆":   "purple",
-    "地方菜系": "darkred",
+    "中餐正餐": "darkred",
+    "异国料理": "cadetblue",
     "面包甜点": "pink",
+    "早餐粥铺": "beige",
     "其他":     "gray",
 }
 
